@@ -1,7 +1,7 @@
-import { useSignUp, useClerk } from "@clerk/clerk-react";
+import { useSignUp, useClerk, useSession } from "@clerk/clerk-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import axios from "axios";
 const SignUpMother = () => {
   const { isLoaded, signUp } = useSignUp();
   const { setActive } = useClerk();
@@ -14,8 +14,7 @@ const SignUpMother = () => {
   const [pendingVerification, setPendingVerification] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const navigate = useNavigate();
-  const { signOut } = useClerk() ;
-
+  const { signOut } = useClerk();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,15 +23,14 @@ const SignUpMother = () => {
     setError("");
 
     try {
-    
-      await signOut() ;
+      await signOut();
 
       const result = await signUp.create({
         emailAddress: email,
         password,
         firstName,
         lastName,
-        unsafeMetadata : { role: "mother" }
+        unsafeMetadata: { role: "mother" },
       });
 
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
@@ -48,6 +46,7 @@ const SignUpMother = () => {
   const handleVerify = async () => {
     if (!isLoaded) return;
     setLoading(true);
+    setError("");
 
     try {
       const completeSignUp = await signUp.attemptEmailAddressVerification({
@@ -56,7 +55,18 @@ const SignUpMother = () => {
 
       if (completeSignUp.status === "complete") {
         await setActive({ session: completeSignUp.createdSessionId });
-        navigate("/mother-dashboard");
+
+        await axios.post("http://localhost:5000/api/mother/signup", {
+          clerkUserId: completeSignUp.createdUserId,
+          email,
+          firstName,
+          lastName,
+          role: "mother",
+        });
+
+        navigate("/profile-setup");
+      } else {
+        setError("Verification process incomplete.");
       }
     } catch (err) {
       setError(err.errors?.[0]?.message || "Verification failed");
@@ -74,7 +84,22 @@ const SignUpMother = () => {
       await signUp.authenticateWithRedirect({
         strategy: "oauth_google",
         redirectUrl: "/sso-callback-for-mothers",
-        redirectUrlComplete: "/mother-dashboard",
+        redirectUrlComplete: "/profile-setup",
+        unsafeMetadata: {
+          role: "mother",
+        },
+      });
+      const completeSignUp = await signUp.attemptEmailAddressVerification({
+        code: verificationCode,
+      });
+      console.log(verificationCode);
+
+      await axios.post("http://localhost:5000/api/mother/signup", {
+        clerkUserId: completeSignUp.createdUserId,
+        email,
+        firstName,
+        lastName,
+        role: "mother",
       });
     } catch (err) {
       setError(err.errors?.[0]?.message || "Google sign up failed");
@@ -83,12 +108,14 @@ const SignUpMother = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-xl shadow-md overflow-hidden p-8">
         {!pendingVerification ? (
           <>
             <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-rose-600">Mother's Tiffin</h1>
+              <h1 className="text-3xl font-bold text-rose-600">
+                Mother's Tiffin
+              </h1>
               <h2 className="text-2xl font-semibold text-gray-800 mt-4">
                 Mother Account Registration
               </h2>
@@ -201,7 +228,7 @@ const SignUpMother = () => {
             </form>
           </>
         ) : (
-          <EmailVerificationView 
+          <EmailVerificationView
             email={email}
             verificationCode={verificationCode}
             setVerificationCode={setVerificationCode}
@@ -223,15 +250,20 @@ const SignUpMother = () => {
 };
 
 // Separate component for verification view
-const EmailVerificationView = ({ email, verificationCode, setVerificationCode, handleVerify, loading, error }) => (
+const EmailVerificationView = ({
+  email,
+  verificationCode,
+  setVerificationCode,
+  handleVerify,
+  loading,
+  error,
+}) => (
   <div className="text-center">
     <h2 className="text-2xl font-semibold text-gray-800">Verify Your Email</h2>
     <p className="text-gray-600 mt-2">Enter the code sent to {email}</p>
-    
+
     {error && (
-      <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-lg">
-        {error}
-      </div>
+      <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-lg">{error}</div>
     )}
 
     <input

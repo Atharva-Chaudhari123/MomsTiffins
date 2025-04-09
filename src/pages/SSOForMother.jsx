@@ -1,24 +1,20 @@
 import { useEffect } from "react";
-import { useUser } from "@clerk/clerk-react";
+import { useUser, useClerk } from "@clerk/clerk-react";
 import { useNavigate } from "react-router-dom";
 
 const SSOCallbackMother = () => {
   const { isSignedIn, user } = useUser();
   const navigate = useNavigate();
+  const { handleRedirectCallback } = useClerk();
 
   useEffect(() => {
     const updateMetadata = async () => {
       if (!isSignedIn || !user) return;
 
       try {
-        // Set metadata for the new user
-        await user.update({
-          unsafeMetadata: {
-            role: "mother", // Set user role dynamically
-          },
-        });
 
-        // Redirect to dashboard after updating metadata
+        await handleRedirectCallback();
+
         navigate("/mother-dashboard");
       } catch (error) {
         console.error("Error updating metadata:", error);
