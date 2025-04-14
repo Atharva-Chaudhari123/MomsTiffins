@@ -36,5 +36,5 @@
 
 ---
 
-## 📂 The Projecct is still under Contruction will add new fettures and commits here soon
+## 📂 The Project is still under Contruction will add new features and commits here soon
 
